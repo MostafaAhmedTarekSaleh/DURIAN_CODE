@@ -1,6 +1,6 @@
 # LoRa Image Transmission System
 
-A robust Arduino-based solution for transmitting image data over LoRa (Long Range) radio networks. This project implements packet-based transmission with headers and markers to ensure reliable image transfer.
+A robust Arduino-based solution for transmitting and receiving image data over LoRa (Long Range) radio networks. This project implements packet-based transmission with headers and markers to ensure reliable image transfer between two devices.
 
 ## Features
 
@@ -55,7 +55,7 @@ LED:               GPIO 22
 
 ## Usage
 
-### Preparing Your Image
+### Setting Up Sender
 
 1. Convert your image to a byte array:
    - Use online tools or Python scripts to convert images to hex byte arrays
@@ -68,6 +68,28 @@ LED:               GPIO 22
        hex_array = ', '.join([f'0x{b:02X}' for b in bytes_data])
        print(f'uint8_t myImageBytes[] = {{{hex_array}}};')
    ```
+
+3. Upload `sender.ino` to your transmitter device
+
+### Setting Up Receiver
+
+1. Upload `receiver.ino` to your receiver device
+2. Open Serial Monitor (115200 baud)
+3. Wait for "LoRa Image Receiver Ready" message
+4. The receiver will automatically detect and reconstruct transmitted images
+
+### Monitoring Reception
+
+The receiver provides detailed feedback:
+```
+Starting image reception: 15420 bytes in 66 packets
+Packet 1/66 (234 bytes)
+Progress: 1/66 packets received
+RSSI: -45 dBm
+...
+All packets received!
+=== IMAGE RECEIVED ===
+```
 
 ### Transmission Protocol
 
@@ -110,13 +132,24 @@ LoRa.begin(433E6);  // 433 MHz (Europe/Asia)
 // LoRa.begin(868E6);  // 868 MHz (Europe)
 ```
 
-## Receiver Implementation
+## Receiver Code
 
-This code handles transmission only. To receive images, you'll need a companion receiver that:
-1. Listens for `IMG_START` markers
-2. Collects and orders packets by `packetId`
-3. Reconstructs the image from received chunks
-4. Detects `IMG_END` marker for completion
+A complete receiver implementation is included in this repository (`receiver.ino`). The receiver:
+- Listens for `IMG_START` markers and allocates memory
+- Collects and orders packets by `packetId`
+- Reconstructs the image from received chunks
+- Detects `IMG_END` marker for completion
+- Outputs received image as hex array for verification
+- Displays RSSI (signal strength) for each packet
+
+### Receiver Features
+
+- **Automatic memory management** - Dynamically allocates buffers
+- **Packet tracking** - Monitors received vs. expected packets
+- **Progress reporting** - Real-time reception status
+- **Image format detection** - Identifies JPEG/PNG formats
+- **Debug output** - Prints received image as C++ byte array
+- **Missing packet detection** - Identifies lost packets
 
 ## Troubleshooting
 
@@ -126,6 +159,17 @@ This code handles transmission only. To receive images, you'll need a companion 
 | LED not blinking | Verify GPIO 22 is correct for your board |
 | No transmission | Check antenna connection |
 | Incomplete transmission | Increase delay between packets |
+| Packets out of order | Receiver handles this automatically |
+| Missing packets | Check RSSI values, improve antenna positioning |
+| "Failed to allocate memory" | Image too large for available RAM, reduce size |
+
+### Checking Signal Strength
+
+Monitor the RSSI (Received Signal Strength Indicator) values:
+- **-30 to -50 dBm**: Excellent signal
+- **-50 to -70 dBm**: Good signal
+- **-70 to -90 dBm**: Fair signal (may have packet loss)
+- **Below -90 dBm**: Poor signal (expect packet loss)
 
 ## Performance Notes
 
@@ -133,6 +177,19 @@ This code handles transmission only. To receive images, you'll need a companion 
 - **Typical speed**: ~1-5 kbps at SF7
 - **Range**: Up to 2-10 km (line of sight, depends on environment)
 - **Larger spreading factors** = longer range but slower speed
+- **Memory requirements**: Receiver needs RAM equal to image size
+- **Recommended max image size**: 
+  - ESP32: ~100-200 KB (depending on available heap)
+  - Arduino Uno: Not suitable for images (limited RAM)
+  - ESP32-S3: Up to 500 KB possible
+
+### Example Transmission Times
+
+| Image Size | Packets | Approximate Time (SF7) |
+|------------|---------|------------------------|
+| 10 KB | 43 | ~30 seconds |
+| 50 KB | 214 | ~2.5 minutes |
+| 100 KB | 428 | ~5 minutes |
 
 ## License
 
